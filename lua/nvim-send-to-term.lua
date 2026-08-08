@@ -62,7 +62,7 @@ local function send_to_term(cmd_text)
   if not terminal_chan then
     -- If there is not terminal open a new one
     vim.cmd("term")
-    terminal_chan = get_first_terminal()
+    terminal_chan, terminal_buffer = get_first_terminal()
   end
 
   if terminal_chan then
