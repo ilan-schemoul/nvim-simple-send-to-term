@@ -90,5 +90,6 @@ local function setup()
 end
 
 return {
-  setup = setup
+  setup = setup,
+  send = send_to_term
 }
