@@ -1,6 +1,10 @@
 # What is it
 
-A plugin to send a command to the terminal most recently opened (which is visible on the current tab).
+A plugin to send a command to the terminal that makes sense. The terminal is picked in that order
+- The most recent visible terminal
+- If no visible terminal, use the most recent hidden terminal:
+-- In that case, we show that hidden terminal in its last visible window.
+-- If its last visible window is closed, use a new window.
 
 ## How is it different from similar plugins
 

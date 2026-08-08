@@ -19,7 +19,6 @@ local function scroll_to_the_end(buffer)
   end
 end
 
--- Get most recent terminal that is visible
 local function get_first_terminal()
   local terminal_chans = {}
   for _, chan in pairs(vim.api.nvim_list_chans()) do
@@ -33,22 +32,38 @@ local function get_first_terminal()
   end
 
   terminal_chans = vim.tbl_filter(function(chan)
-    local hidden = vim.fn.getbufinfo(chan["buffer"])[1].hidden
-    local buffer = vim.fn.getbufinfo(chan["buffer"])[1].bufnr
-    local is_visible = hidden == 0
-
-    return is_visible and buffer_is_in_tab(buffer)
+    return buffer_is_in_tab(chan["buffer"])
   end, terminal_chans)
 
-  if not vim.tbl_isempty(terminal_chans) then
-    local newest_terminal = terminal_chans[1]
-    for _, term in ipairs(terminal_chans) do
-      if term["buffer"] < newest_terminal["buffer"] then
-        newest_terminal = term
-      end
+  local function get_bufinfo(chan)
+    return vim.fn.getbufinfo(chan["buffer"])[1]
+  end
+
+  table.sort(terminal_chans, function(a, b)
+    -- If both visible or both hidden, return last used first
+    if get_bufinfo(a).hidden == get_bufinfo(b).hidden then
+      return get_bufinfo(a).lastused > get_bufinfo(b).lastused
     end
 
-    return newest_terminal["id"], newest_terminal["buffer"]
+    return get_bufinfo(a).hidden < get_bufinfo(b).hidden
+  end)
+
+  local terminal = terminal_chans[1]
+  if terminal then
+    return terminal["id"], terminal["buffer"]
+  end
+end
+
+local function show_terminal_in_last_window(buffer)
+  if vim.fn.bufwinid(buffer) ~= -1 then
+    return
+  end
+
+  local win = vim.b[buffer].send_to_term_win
+  if win and vim.api.nvim_win_is_valid(win) then
+    vim.api.nvim_win_set_buf(win, buffer)
+  else
+    vim.cmd("sbuffer " .. buffer)
   end
 end
 
@@ -65,6 +80,10 @@ local function send_to_term(cmd_text)
     terminal_chan, terminal_buffer = get_first_terminal()
   end
 
+  if terminal_buffer then
+    show_terminal_in_last_window(terminal_buffer)
+  end
+
   if terminal_chan then
     -- We send the command to the terminal. We add a newline
     -- so the command is executed.
@@ -74,6 +93,14 @@ local function send_to_term(cmd_text)
 end
 
 local function setup()
+  vim.api.nvim_create_autocmd("BufWinLeave", {
+    callback = function(event)
+      if vim.bo[event.buf].buftype == "terminal" then
+        vim.b[event.buf].send_to_term_win = vim.api.nvim_get_current_win()
+      end
+    end,
+  })
+
   vim.api.nvim_create_user_command("SendToTerm", function(args)
     if #args.args ~= 0 then
       vim.schedule(function() send_to_term(args.args) end)
